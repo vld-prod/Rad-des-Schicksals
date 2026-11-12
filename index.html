@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glücksrad – Der bunte Zufallsgenerator</title>
+<meta name="description" content="Glücksrad mit Paarbildung, Gruppen und Eliminierung. Anpassbar mit Sound, Tempo und Dauer.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎡</text></svg>">
+<style>
+:root{
+  --bg1:#1b1464;--bg2:#6a11cb;--bg3:#ff3d8b;
+  --card:rgba(255,255,255,.12);--card-b:rgba(255,255,255,.25);
+  --text:#fff;--muted:rgba(255,255,255,.72);
+  --accent:#ffd23f;--accent2:#34e0a1;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+  color:var(--text);
+  background:linear-gradient(135deg,var(--bg1),var(--bg2),var(--bg3),#ff9e2c,var(--bg2),var(--bg1));
+  background-size:400% 400%;
+  animation:bgmove 24s ease infinite;
+  overflow-x:hidden;
+}
+@keyframes bgmove{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+.blobs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.blobs span{position:absolute;border-radius:50%;filter:blur(50px);opacity:.45;animation:float 18s ease-in-out infinite}
+.blobs span:nth-child(1){width:320px;height:320px;background:#ff3d8b;left:-80px;top:10%}
+.blobs span:nth-child(2){width:260px;height:260px;background:#34e0a1;right:-60px;top:5%;animation-delay:-5s}
+.blobs span:nth-child(3){width:380px;height:380px;background:#ffd23f;left:35%;bottom:-160px;animation-delay:-9s}
+.blobs span:nth-child(4){width:220px;height:220px;background:#3dc2ff;right:20%;bottom:20%;animation-delay:-12s}
+@keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(40px,-60px) scale(1.15)}66%{transform:translate(-50px,30px) scale(.9)}}
+
+.app{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;padding:18px clamp(12px,3vw,32px) 22px;gap:14px;max-width:1500px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+h1{margin:0;font-size:clamp(1.6rem,3.5vw,2.4rem);font-weight:900;letter-spacing:.5px;
+  background:linear-gradient(90deg,#fff,#ffd23f,#ff7eb3,#fff);background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 6s linear infinite}
+h1 .emoji{display:inline-block;-webkit-text-fill-color:initial;animation:wob 3s ease-in-out infinite}
+@keyframes shine{to{background-position:300% 0}}
+@keyframes wob{0%,100%{transform:rotate(-12deg)}50%{transform:rotate(12deg)}}
+
+.modes{display:flex;gap:6px;background:var(--card);border:1px solid var(--card-b);backdrop-filter:blur(10px);padding:5px;border-radius:999px;flex-wrap:wrap}
+.modes button{border:0;background:transparent;color:var(--text);font:inherit;font-weight:700;padding:9px 18px;border-radius:999px;cursor:pointer;transition:.25s}
+.modes button:hover{background:rgba(255,255,255,.15)}
+.modes button.active{background:linear-gradient(135deg,#ffd23f,#ff8a3d);color:#3a1a00;box-shadow:0 4px 16px rgba(255,170,0,.5);transform:scale(1.04)}
+
+main{flex:1;display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:18px;min-height:0}
+.card{background:var(--card);border:1px solid var(--card-b);backdrop-filter:blur(14px);border-radius:22px;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+
+.left{display:flex;flex-direction:column;padding:14px;min-height:560px;height:calc(100vh - 130px);position:sticky;top:14px}
+.tabs{display:none;gap:6px;margin-bottom:10px}
+.tabs.show{display:flex;animation:pop .35s}
+.tabs button{flex:1;border:0;padding:9px;border-radius:12px;font:inherit;font-weight:700;color:var(--text);background:rgba(255,255,255,.12);cursor:pointer;transition:.2s}
+.tabs button.active{background:#fff;color:#4b1fa8}
+@keyframes pop{from{opacity:0;transform:translateY(-8px) scale(.96)}to{opacity:1;transform:none}}
+.counter{font-size:.85rem;color:var(--muted);margin:0 4px 6px;display:flex;justify-content:space-between}
+textarea{flex:1;width:100%;resize:none;border:2px solid transparent;border-radius:16px;padding:14px;font:inherit;font-size:1.02rem;line-height:1.5;
+  background:rgba(255,255,255,.93);color:#2a1456;outline:none;transition:.2s;min-height:200px}
+textarea:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(255,210,63,.35)}
+textarea::placeholder{color:#8f7bb8}
+#resultArea{display:none;background:rgba(255,255,255,.97)}
+.panel-extra{margin-top:10px;display:none;gap:8px;flex-wrap:wrap;align-items:center}
+.panel-extra.show{display:flex;animation:pop .35s}
+.panel-extra label{font-size:.9rem;color:var(--muted)}
+.btnrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.btn{border:0;font:inherit;font-weight:800;padding:12px 14px;border-radius:14px;cursor:pointer;color:#fff;
+  background:linear-gradient(135deg,#7b4dff,#ff3d8b);box-shadow:0 6px 18px rgba(0,0,0,.25);transition:transform .15s,box-shadow .15s,filter .2s}
+.btn:hover{transform:translateY(-2px);filter:brightness(1.1)}
+.btn:active{transform:translateY(1px) scale(.98)}
+.btn.green{background:linear-gradient(135deg,#12b886,#34e0a1);color:#06301f}
+.btn.gold{background:linear-gradient(135deg,#ffd23f,#ff8a3d);color:#3a1a00}
+.btn.ghost{background:rgba(255,255,255,.16);box-shadow:none}
+.btn.full{grid-column:1/-1}
+input[type=number]{width:70px;padding:8px;border-radius:10px;border:0;font:inherit;font-weight:700;text-align:center}
+
+.right{display:flex;flex-direction:column;gap:14px;min-width:0}
+.stage{position:relative;display:flex;align-items:center;justify-content:center;padding:18px;flex:1}
+.wheelwrap{position:relative;width:min(100%,calc(100vh - 260px),720px);min-width:260px;aspect-ratio:1/1}
+#wheel{width:100%;height:100%;display:block;filter:drop-shadow(0 14px 30px rgba(0,0,0,.45))}
+.pointer{position:absolute;top:-2.5%;left:50%;width:9%;height:11%;margin-left:-4.5%;z-index:3;transform-origin:50% 20%;transition:transform .09s ease-out;
+  filter:drop-shadow(0 4px 6px rgba(0,0,0,.5))}
+.pointer svg{width:100%;height:100%}
+.spinbtn{position:absolute;left:50%;top:50%;width:19%;aspect-ratio:1/1;transform:translate(-50%,-50%);border-radius:50%;border:5px solid #fff;z-index:4;cursor:pointer;
+  font:inherit;font-weight:900;font-size:clamp(.8rem,2.3vw,1.4rem);letter-spacing:1px;color:#3a1a00;
+  background:radial-gradient(circle at 35% 30%,#fff7c2,#ffd23f 45%,#ff8a3d);box-shadow:0 0 0 0 rgba(255,210,63,.7),0 8px 24px rgba(0,0,0,.45);
+  animation:pulse 2s infinite;transition:transform .15s}
+.spinbtn:hover{transform:translate(-50%,-50%) scale(1.08)}
+.spinbtn:disabled{animation:none;filter:grayscale(.5);cursor:not-allowed}
+@keyframes pulse{70%{box-shadow:0 0 0 24px rgba(255,210,63,0),0 8px 24px rgba(0,0,0,.45)}100%{box-shadow:0 0 0 0 rgba(255,210,63,0),0 8px 24px rgba(0,0,0,.45)}}
+
+.settings{padding:14px 18px}
+.settings summary{cursor:pointer;font-weight:800;font-size:1.05rem;list-style:none;display:flex;align-items:center;gap:8px}
+.settings summary::-webkit-details-marker{display:none}
+.settings summary::after{content:"▾";margin-left:auto;transition:.3s}
+.settings[open] summary::after{transform:rotate(180deg)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px 22px;margin-top:14px}
+.field{display:flex;flex-direction:column;gap:6px;font-size:.92rem}
+.field .lab{display:flex;justify-content:space-between;font-weight:700}
+.field .lab b{color:var(--accent)}
+input[type=range]{width:100%;accent-color:#ffd23f;height:6px}
+select{padding:9px;border-radius:10px;border:0;font:inherit;font-weight:700;color:#3a1a7a}
+.check{flex-direction:row;align-items:center;gap:10px;font-weight:700;cursor:pointer}
+.check input{width:20px;height:20px;accent-color:#34e0a1}
+
+.overlay{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;background:rgba(15,5,50,.65);backdrop-filter:blur(6px)}
+.overlay.show{display:flex;animation:fade .3s}
+@keyframes fade{from{opacity:0}}
+.modal{text-align:center;padding:32px 36px;border-radius:28px;max-width:min(92vw,560px);
+  background:linear-gradient(160deg,#fff,#ffeaa8);color:#3a1a00;box-shadow:0 30px 80px rgba(0,0,0,.5);animation:boing .6s cubic-bezier(.2,1.6,.4,1)}
+@keyframes boing{from{transform:scale(.3) rotate(-8deg);opacity:0}}
+.modal small{letter-spacing:3px;font-weight:800;color:#b36b00}
+.modal h2{margin:8px 0 22px;font-size:clamp(1.8rem,6vw,3rem);word-break:break-word;color:#c2185b}
+.modal .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+canvas#confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}
+footer{text-align:center;color:var(--muted);font-size:.8rem}
+
+@media (max-width:900px){
+  main{grid-template-columns:1fr}
+  .left{position:static;height:auto;min-height:0}
+  textarea{min-height:240px}
+  .wheelwrap{width:min(100%,560px)}
+}
+</style>
+</head>
+<body>
+<div class="blobs"><span></span><span></span><span></span><span></span></div>
+<canvas id="confetti"></canvas>
+
+<div class="app">
+  <header>
+    <h1><span class="emoji">🎡</span> Glücksrad</h1>
+    <nav class="modes" id="modes" aria-label="Modus">
+      <button data-mode="standard" class="active">🎯 Standard</button>
+      <button data-mode="pairs">👫 Paare bilden</button>
+      <button data-mode="groups">👥 Gruppen bilden</button>
+      <button data-mode="elim">💥 Eliminierung</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="card left">
+      <div class="tabs" id="tabs">
+        <button data-tab="input" class="active">✏️ Eingabe</button>
+        <button data-tab="result">✨ Ergebnis</button>
+      </div>
+      <div class="counter"><span id="countLabel">0 Einträge</span><span>Ein Eintrag pro Zeile</span></div>
+      <textarea id="inputArea" spellcheck="false" placeholder="Einen Eintrag pro Zeile …"></textarea>
+      <textarea id="resultArea" readonly placeholder="Hier erscheint das Ergebnis …"></textarea>
+
+      <div class="panel-extra" id="extraPairs">
+        <button class="btn gold" id="doPairs" style="flex:1">🔀 Paare bilden / neu mischen</button>
+      </div>
+      <div class="panel-extra" id="extraGroups">
+        <label for="groupSize">Gruppengröße:</label>
+        <input type="number" id="groupSize" min="2" max="50" value="3">
+        <button class="btn gold" id="doGroups" style="flex:1">🔀 Aufteilen</button>
+      </div>
+      <div class="panel-extra" id="extraElim">
+        <label class="field check" style="margin:0"><input type="checkbox" id="autoRemove" checked> Gewinner automatisch entfernen</label>
+      </div>
+      <div class="panel-extra" id="extraCopy">
+        <button class="btn ghost" id="copyResult" style="flex:1">📋 Ergebnis kopieren</button>
+      </div>
+
+      <div class="btnrow">
+        <button class="btn green" id="saveBtn">💾 Liste speichern</button>
+        <button class="btn" id="loadBtn">📂 Liste laden</button>
+        <button class="btn ghost" id="shuffleBtn">🔀 Reihenfolge mischen</button>
+        <button class="btn ghost" id="clearBtn">🗑️ Leeren</button>
+      </div>
+      <input type="file" id="fileInput" accept=".txt,text/plain" hidden>
+    </section>
+
+    <section class="right">
+      <div class="card stage">
+        <div class="wheelwrap" id="wheelwrap">
+          <div class="pointer" id="pointer">
+            <svg viewBox="0 0 100 120"><defs><linearGradient id="pg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#ffb3d1"/></linearGradient></defs>
+              <path d="M50 118 L6 20 Q4 8 18 6 L82 6 Q96 8 94 20 Z" fill="url(#pg)" stroke="#c2185b" stroke-width="6" stroke-linejoin="round"/>
+              <circle cx="50" cy="28" r="9" fill="#c2185b"/></svg>
+          </div>
+          <canvas id="wheel"></canvas>
+          <button class="spinbtn" id="spinBtn">DREHEN</button>
+        </div>
+      </div>
+
+      <details class="card settings" id="settings" open>
+        <summary>⚙️ Einstellungen</summary>
+        <div class="grid">
+          <label class="field check"><input type="checkbox" id="sound" checked> 🔊 Sound an</label>
+          <div class="field"><div class="lab">Lautstärke <b id="volV"></b></div><input type="range" id="volume" min="0" max="100" value="60"></div>
+          <div class="field"><div class="lab">Tempo (Umdrehungen) <b id="speedV"></b></div><input type="range" id="speed" min="1" max="10" step="1" value="5"></div>
+          <div class="field"><div class="lab">Dauer <b id="durV"></b></div><input type="range" id="duration" min="2" max="20" step="1" value="6"></div>
+          <div class="field"><div class="lab">Farbschema</div>
+            <select id="theme">
+              <option value="bunt">🌈 Bunt</option>
+              <option value="pastell">🍬 Pastell</option>
+              <option value="neon">⚡ Neon</option>
+              <option value="warm">🔥 Warm</option>
+              <option value="kalt">🧊 Kalt</option>
+            </select></div>
+          <div class="field"><div class="lab">Schriftgröße <b id="fontV"></b></div><input type="range" id="fontScale" min="60" max="140" step="5" value="100"></div>
+          <label class="field check"><input type="checkbox" id="tick" checked> 🔔 Klick-Geräusch beim Drehen</label>
+          <label class="field check"><input type="checkbox" id="confettiOn" checked> 🎉 Konfetti</label>
+        </div>
+      </details>
+    </section>
+  </main>
+  <footer>Deine Einstellungen und die Liste werden lokal in deinem Browser gespeichert.</footer>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <small id="winLabel">GEWINNER</small>
+    <h2 id="winText"></h2>
+    <div class="row">
+      <button class="btn gold" id="winClose">Schließen</button>
+      <button class="btn" id="winRemove">Gewinner entfernen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const TAU=Math.PI*2;
+const LS="gluecksrad.v2";
+
+/* ---------- Zufall ---------- */
+function rnd(){const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]/4294967296}
+function shuffle(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+/* ---------- Zustand ---------- */
+const state={mode:"standard",tab:"input",angle:0,spinning:false,lastWinner:null};
+const defaults={text:"",sound:true,volume:60,speed:5,duration:6,theme:"bunt",fontScale:100,tick:true,confettiOn:true,groupSize:3,autoRemove:true,mode:"standard"};
+let saved={};
+try{saved=JSON.parse(localStorage.getItem(LS))||{}}catch(e){}
+const S=Object.assign({},defaults,saved);
+function persist(){
+  try{localStorage.setItem(LS,JSON.stringify({text:inputArea.value,sound:$("sound").checked,volume:+$("volume").value,speed:+$("speed").value,duration:+$("duration").value,theme:$("theme").value,fontScale:+$("fontScale").value,tick:$("tick").checked,confettiOn:$("confettiOn").checked,groupSize:+$("groupSize").value,autoRemove:$("autoRemove").checked,mode:state.mode}))}catch(e){}
+}
+
+const inputArea=$("inputArea"),resultArea=$("resultArea");
+const items=()=>inputArea.value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+
+/* ---------- Farben ---------- */
+const THEMES={
+  bunt:["#ff3d6e","#ff9e2c","#ffd23f","#34e0a1","#3dc2ff","#7b4dff","#d63df0","#ff6b3d"],
+  pastell:["#ffadad","#ffd6a5","#fdffb6","#caffbf","#9bf6ff","#a0c4ff","#bdb2ff","#ffc6ff"],
+  neon:["#ff00a8","#00f5d4","#fee440","#9b5de5","#00bbf9","#f15bb5","#80ff00","#ff6700"],
+  warm:["#ff595e","#ff924c","#ffca3a","#e5383b","#ff7b00","#f4a261","#d62828","#ffb703"],
+  kalt:["#4361ee","#4cc9f0","#3a0ca3","#7209b7","#4895ef","#560bad","#2ec4b6","#6a8cff"]
+};
+function colorFor(i,n){
+  const p=THEMES[$("theme").value]||THEMES.bunt;
+  let c=p[i%p.length];
+  if(i===n-1&&n>1&&c===p[0])c=p[(i+3)%p.length];
+  return c;
+}
+function lum(hex){const v=parseInt(hex.slice(1),16);const r=v>>16,g=(v>>8)&255,b=v&255;return(0.299*r+0.587*g+0.114*b)/255}
+
+/* ---------- Rad zeichnen ---------- */
+const canvas=$("wheel"),ctx=canvas.getContext("2d");
+const cache=document.createElement("canvas"),cctx=cache.getContext("2d");
+let W=0;
+function resize(){
+  const r=canvas.getBoundingClientRect();
+  const dpr=Math.min(window.devicePixelRatio||1,2.5);
+  W=Math.round(r.width*dpr);
+  canvas.width=cache.width=W;canvas.height=cache.height=W;
+  renderCache();
+}
+function renderCache(){
+  const list=items(),n=list.length;
+  const c=cctx;c.clearRect(0,0,W,W);
+  const R=W/2,rim=W*0.045,r=R-rim-W*0.004;
+  c.save();c.translate(R,R);
+  if(n===0){
+    const g=c.createRadialGradient(0,0,r*.1,0,0,r);g.addColorStop(0,"#ffffff");g.addColorStop(1,"#c9b8ff");
+    c.fillStyle=g;c.beginPath();c.arc(0,0,r,0,TAU);c.fill();
+    c.fillStyle="#6a3fd1";c.textAlign="center";c.textBaseline="middle";c.font=`800 ${W*.045}px "Segoe UI",sans-serif`;
+    c.fillText("Füge Einträge hinzu",0,-W*.02);c.font=`600 ${W*.032}px "Segoe UI",sans-serif`;c.fillText("← Textfeld",0,W*.035);
+    c.restore();return;
+  }
+  const a=TAU/n;
+  for(let i=0;i<n;i++){
+    const col=colorFor(i,n);
+    const g=c.createRadialGradient(0,0,r*.1,0,0,r);
+    g.addColorStop(0,shade(col,.25));g.addColorStop(1,col);
+    c.beginPath();c.moveTo(0,0);c.arc(0,0,r,i*a,(i+1)*a);c.closePath();
+    c.fillStyle=g;c.fill();
+    if(n>1){c.strokeStyle="rgba(255,255,255,.65)";c.lineWidth=Math.max(1,W*.003);c.stroke()}
+  }
+  // Text
+  const fs=parseInt($("fontScale").value)/100;
+  const maxFont=W*.052*fs;
+  const arc=r*a;
+  let size=Math.min(maxFont,arc*.55);
+  size=Math.max(size,W*.012);
+  for(let i=0;i<n;i++){
+    const col=colorFor(i,n);
+    c.save();c.rotate(i*a+a/2);
+    c.textAlign="right";c.textBaseline="middle";
+    c.font=`800 ${size}px "Segoe UI",sans-serif`;
+    const dark=lum(col)>.62;
+    c.fillStyle=dark?"#2a1456":"#fff";
+    if(!dark){c.shadowColor="rgba(0,0,0,.45)";c.shadowBlur=W*.006}
+    let t=list[i];const maxW=r*.78;
+    if(c.measureText(t).width>maxW){while(t.length>1&&c.measureText(t+"…").width>maxW)t=t.slice(0,-1);t+="…"}
+    c.fillText(t,r*.92,0);
+    c.restore();
+  }
+  // Rand innen
+  c.beginPath();c.arc(0,0,r,0,TAU);c.strokeStyle="rgba(255,255,255,.9)";c.lineWidth=W*.006;c.stroke();
+  c.restore();
+}
+function shade(hex,amt){
+  const v=parseInt(hex.slice(1),16);let r=v>>16,g=(v>>8)&255,b=v&255;
+  r=Math.round(r+(255-r)*amt);g=Math.round(g+(255-g)*amt);b=Math.round(b+(255-b)*amt);
+  return`rgb(${r},${g},${b})`;
+}
+function draw(t){
+  const R=W/2;
+  ctx.clearRect(0,0,W,W);
+  // Rand mit Lichtern
+  ctx.save();ctx.translate(R,R);
+  const rg=ctx.createLinearGradient(-R,-R,R,R);rg.addColorStop(0,"#fff6c9");rg.addColorStop(.5,"#ffb300");rg.addColorStop(1,"#c2185b");
+  ctx.beginPath();ctx.arc(0,0,R*.995,0,TAU);ctx.fillStyle=rg;ctx.fill();
+  ctx.beginPath();ctx.arc(0,0,R-W*.045,0,TAU);ctx.fillStyle="#2a0f6b";ctx.fill();
+  const L=24;
+  for(let i=0;i<L;i++){
+    const ang=i/L*TAU;
+    const on=state.spinning?((Math.floor(t/90)+i)%2===0):((Math.floor(t/500)+i)%2===0);
+    ctx.beginPath();ctx.arc(Math.cos(ang)*(R-W*.0225),Math.sin(ang)*(R-W*.0225),W*.011,0,TAU);
+    ctx.fillStyle=on?"#fff":"#ffd23f";ctx.shadowColor=on?"#fff":"transparent";ctx.shadowBlur=on?W*.02:0;ctx.fill();
+  }
+  ctx.restore();
+  // Rad
+  ctx.save();ctx.translate(R,R);ctx.rotate(state.angle);ctx.drawImage(cache,-R,-R);ctx.restore();
+  // Nabe
+  ctx.save();ctx.translate(R,R);
+  ctx.beginPath();ctx.arc(0,0,W*.105,0,TAU);ctx.fillStyle="rgba(0,0,0,.25)";ctx.fill();
+  ctx.restore();
+}
+
+/* ---------- Sound ---------- */
+let actx=null;
+function audio(){if(!actx){try{actx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(actx&&actx.state==="suspended")actx.resume();return actx}
+const vol=()=>$("sound").checked?(+$("volume").value/100):0;
+function playTick(){
+  if(!$("tick").checked)return;const v=vol();if(!v)return;const a=audio();if(!a)return;
+  const o=a.createOscillator(),g=a.createGain();
+  o.type="triangle";o.frequency.setValueAtTime(900+rnd()*200,a.currentTime);o.frequency.exponentialRampToValueAtTime(380,a.currentTime+.05);
+  g.gain.setValueAtTime(.35*v,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.06);
+  o.connect(g).connect(a.destination);o.start();o.stop(a.currentTime+.07);
+}
+function playWin(){
+  const v=vol();if(!v)return;const a=audio();if(!a)return;
+  const notes=[523.25,659.25,783.99,1046.5,1318.5];
+  notes.forEach((f,i)=>{
+    const o=a.createOscillator(),g=a.createGain();const t=a.currentTime+i*.11;
+    o.type="square";o.frequency.value=f;
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.18*v,t+.02);g.gain.exponentialRampToValueAtTime(.001,t+.5);
+    o.connect(g).connect(a.destination);o.start(t);o.stop(t+.55);
+  });
+}
+function playClick(){
+  const v=vol();if(!v)return;const a=audio();if(!a)return;
+  const o=a.createOscillator(),g=a.createGain();o.type="sine";o.frequency.value=660;
+  g.gain.setValueAtTime(.2*v,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.12);
+  o.connect(g).connect(a.destination);o.start();o.stop(a.currentTime+.13);
+}
+
+/* ---------- Drehen ---------- */
+const pointer=$("pointer");
+function indexAt(angle,n){
+  const a=TAU/n;
+  let x=(-Math.PI/2-angle)%TAU;if(x<0)x+=TAU;
+  return Math.min(n-1,Math.floor(x/a));
+}
+function wiggle(){
+  pointer.style.transform="rotate(-22deg)";
+  setTimeout(()=>pointer.style.transform="rotate(0)",80);
+}
+function spin(){
+  if(state.spinning)return;
+  const list=items(),n=list.length;
+  if(n<2){toast(n===0?"Bitte zuerst Einträge eingeben.":"Mindestens 2 Einträge nötig.");return;}
+  audio();
+  const win=Math.floor(rnd()*n);
+  const off=.1+rnd()*.8;
+  const a=TAU/n;
+  const speed=+$("speed").value,dur=+$("duration").value;
+  const minRot=Math.max(2,speed*dur*.33)*TAU;
+  const start=state.angle;
+  let base=-Math.PI/2-(win+off)*a;
+  let k=Math.ceil((start+minRot-base)/TAU);
+  const target=base+k*TAU;
+  const total=target-start;
+  const t0=performance.now(),D=dur*1000;
+  state.spinning=true;$("spinBtn").disabled=true;
+  let lastIdx=indexAt(start,n);
+  function step(now){
+    const p=Math.min(1,(now-t0)/D);
+    const e=1-Math.pow(1-p,3.4);
+    state.angle=start+total*e;
+    const idx=indexAt(state.angle,n);
+    if(idx!==lastIdx){lastIdx=idx;playTick();wiggle()}
+    if(p<1)requestAnimationFrame(step);
+    else{state.spinning=false;$("spinBtn").disabled=false;state.angle=target%TAU;finish(list[win],win)}
+  }
+  requestAnimationFrame(step);
+}
+function finish(name,idx){
+  state.lastWinner={name,idx};
+  playWin();if($("confettiOn").checked)burst();
+  $("winText").textContent=name;
+  $("winLabel").textContent=state.mode==="elim"?"AUSGESCHIEDEN / GEWÄHLT":"GEWINNER";
+  $("winRemove").style.display=(state.mode==="elim"&&$("autoRemove").checked)?"none":"";
+  $("overlay").classList.add("show");
+  if(state.mode==="elim"&&$("autoRemove").checked)removeWinner(true);
+}
+function removeWinner(silent){
+  if(!state.lastWinner)return;
+  const lines=inputArea.value.split(/\r?\n/);
+  let cnt=-1;const target=state.lastWinner.idx;
+  const out=[];
+  for(const l of lines){
+    if(l.trim()){cnt++;if(cnt===target)continue}
+    out.push(l);
+  }
+  inputArea.value=out.join("\n");
+  state.lastWinner=null;
+  onInput();
+}
+
+/* ---------- Konfetti ---------- */
+const cv=$("confetti"),cx=cv.getContext("2d");let parts=[],cfRun=false;
+function burst(){
+  cv.width=innerWidth;cv.height=innerHeight;
+  const cols=["#ff3d6e","#ffd23f","#34e0a1","#3dc2ff","#7b4dff","#ff9e2c","#fff"];
+  for(let i=0;i<180;i++){
+    const side=i%2?1:0;
+    parts.push({x:side?cv.width+10:-10,y:cv.height*(.3+rnd()*.3),vx:(side?-1:1)*(4+rnd()*10),vy:-8-rnd()*10,g:.28,s:6+rnd()*8,r:rnd()*TAU,vr:(rnd()-.5)*.4,c:cols[Math.floor(rnd()*cols.length)],life:1});
+  }
+  for(let i=0;i<120;i++){
+    parts.push({x:cv.width/2+(rnd()-.5)*200,y:cv.height*.35,vx:(rnd()-.5)*14,vy:-6-rnd()*12,g:.3,s:5+rnd()*8,r:rnd()*TAU,vr:(rnd()-.5)*.4,c:cols[Math.floor(rnd()*cols.length)],life:1});
+  }
+  if(!cfRun){cfRun=true;requestAnimationFrame(cfStep)}
+}
+function cfStep(){
+  cx.clearRect(0,0,cv.width,cv.height);
+  parts=parts.filter(p=>p.y<cv.height+30&&p.life>0);
+  for(const p of parts){
+    p.vy+=p.g;p.x+=p.vx;p.y+=p.vy;p.vx*=.992;p.r+=p.vr;p.life-=.004;
+    cx.save();cx.translate(p.x,p.y);cx.rotate(p.r);cx.globalAlpha=Math.max(0,Math.min(1,p.life*2));cx.fillStyle=p.c;cx.fillRect(-p.s/2,-p.s/3,p.s,p.s*.6);cx.restore();
+  }
+  if(parts.length)requestAnimationFrame(cfStep);else{cfRun=false;cx.clearRect(0,0,cv.width,cv.height)}
+}
+
+/* ---------- Modi ---------- */
+function setMode(m){
+  state.mode=m;
+  document.querySelectorAll("#modes button").forEach(b=>b.classList.toggle("active",b.dataset.mode===m));
+  const hasResult=(m==="pairs"||m==="groups");
+  $("tabs").classList.toggle("show",hasResult);
+  $("extraPairs").classList.toggle("show",m==="pairs");
+  $("extraGroups").classList.toggle("show",m==="groups");
+  $("extraElim").classList.toggle("show",m==="elim");
+  if(!hasResult)setTab("input");
+  else{setTab("input");if(m==="pairs")resultArea.placeholder="Hier erscheinen die Paare …";else resultArea.placeholder="Hier erscheinen die Gruppen …";}
+  updateCopy();
+  playClick();persist();
+}
+function setTab(t){
+  state.tab=t;
+  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));
+  inputArea.style.display=t==="input"?"":"none";
+  resultArea.style.display=t==="result"?"block":"none";
+  updateCopy();
+}
+function updateCopy(){$("extraCopy").classList.toggle("show",state.tab==="result"&&(state.mode==="pairs"||state.mode==="groups"))}
+
+function makePairs(){
+  const l=shuffle(items());
+  if(l.length<2){toast("Mindestens 2 Einträge nötig.");return}
+  const out=[];
+  for(let i=0;i+1<l.length;i+=2)out.push(`${l[i]} – ${l[i+1]}`);
+  if(l.length%2===1){
+    if(out.length){out[out.length-1]+=` – ${l[l.length-1]}`;out.push("")}
+    out.push("(Ungerade Anzahl: Die letzte Gruppe besteht aus drei Personen.)");
+  }
+  resultArea.value=out.join("\n").trim();
+  setTab("result");playWin();if($("confettiOn").checked)burst();
+}
+function makeGroups(){
+  const size=Math.max(2,Math.min(50,parseInt($("groupSize").value)||3));
+  const l=shuffle(items());
+  if(l.length<2){toast("Mindestens 2 Einträge nötig.");return}
+  const gc=Math.max(1,Math.round(l.length/size));
+  const groups=Array.from({length:gc},()=>[]);
+  l.forEach((x,i)=>groups[i%gc].push(x));
+  resultArea.value=groups.map((g,i)=>`Gruppe ${i+1}: ${g.join(", ")}`).join("\n");
+  setTab("result");playWin();if($("confettiOn").checked)burst();
+}
+
+/* ---------- Datei speichern / laden ---------- */
+function saveList(){
+  const txt=inputArea.value;
+  if(!txt.trim()){toast("Die Liste ist leer.");return}
+  const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="gluecksrad-liste.txt";document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  toast("Liste gespeichert ✔");
+}
+function loadList(file){
+  if(!file)return;
+  const fr=new FileReader();
+  fr.onload=()=>{inputArea.value=String(fr.result).replace(/^\uFEFF/,"");setTab("input");onInput();toast("Liste geladen ✔")};
+  fr.onerror=()=>toast("Datei konnte nicht gelesen werden.");
+  fr.readAsText(file,"utf-8");
+}
+
+/* ---------- Toast ---------- */
+let toastEl;
+function toast(msg){
+  if(!toastEl){toastEl=document.createElement("div");
+    Object.assign(toastEl.style,{position:"fixed",left:"50%",bottom:"28px",transform:"translateX(-50%) translateY(30px)",background:"#fff",color:"#4b1fa8",padding:"12px 22px",borderRadius:"999px",fontWeight:"800",boxShadow:"0 10px 30px rgba(0,0,0,.35)",zIndex:"80",opacity:"0",transition:".3s",pointerEvents:"none"});
+    document.body.appendChild(toastEl)}
+  toastEl.textContent=msg;toastEl.style.opacity="1";toastEl.style.transform="translateX(-50%)";
+  clearTimeout(toast.t);toast.t=setTimeout(()=>{toastEl.style.opacity="0";toastEl.style.transform="translateX(-50%) translateY(30px)"},2200);
+}
+
+/* ---------- Events ---------- */
+function onInput(){
+  const n=items().length;
+  $("countLabel").textContent=n===1?"1 Eintrag":`${n} Einträge`;
+  renderCache();persist();
+}
+function updateLabels(){
+  $("volV").textContent=$("volume").value+" %";
+  $("speedV").textContent=$("speed").value;
+  $("durV").textContent=$("duration").value+" s";
+  $("fontV").textContent=$("fontScale").value+" %";
+}
+inputArea.addEventListener("input",onInput);
+$("modes").addEventListener("click",e=>{const b=e.target.closest("button");if(b)setMode(b.dataset.mode)});
+$("tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(b)setTab(b.dataset.tab)});
+$("spinBtn").addEventListener("click",spin);
+$("doPairs").addEventListener("click",makePairs);
+$("doGroups").addEventListener("click",makeGroups);
+$("saveBtn").addEventListener("click",saveList);
+$("loadBtn").addEventListener("click",()=>$("fileInput").click());
+$("fileInput").addEventListener("change",e=>{loadList(e.target.files[0]);e.target.value=""});
+$("shuffleBtn").addEventListener("click",()=>{inputArea.value=shuffle(items()).join("\n");onInput();playClick()});
+$("clearBtn").addEventListener("click",()=>{if(!inputArea.value.trim()||confirm("Liste wirklich leeren?")){inputArea.value="";resultArea.value="";onInput()}});
+$("copyResult").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(resultArea.value);toast("Kopiert ✔")}catch(e){resultArea.select();document.execCommand("copy");toast("Kopiert ✔")}});
+$("winClose").addEventListener("click",()=>$("overlay").classList.remove("show"));
+$("winRemove").addEventListener("click",()=>{removeWinner();$("overlay").classList.remove("show")});
+$("overlay").addEventListener("click",e=>{if(e.target===$("overlay"))$("overlay").classList.remove("show")});
+["sound","volume","speed","duration","theme","fontScale","tick","confettiOn","groupSize","autoRemove"].forEach(id=>{
+  $(id).addEventListener("input",()=>{updateLabels();if(id==="theme"||id==="fontScale")renderCache();persist()});
+  $(id).addEventListener("change",()=>{persist()});
+});
+$("volume").addEventListener("change",playClick);
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape")$("overlay").classList.remove("show");
+  if(e.code==="Space"&&!/TEXTAREA|INPUT|SELECT/.test(document.activeElement.tagName)&&!$("overlay").classList.contains("show")){e.preventDefault();spin()}
+});
+new ResizeObserver(()=>resize()).observe($("wheelwrap"));
+
+/* ---------- Init ---------- */
+inputArea.value=S.text;
+$("sound").checked=S.sound;$("volume").value=S.volume;$("speed").value=S.speed;$("duration").value=S.duration;
+$("theme").value=S.theme;$("fontScale").value=S.fontScale;$("tick").checked=S.tick;$("confettiOn").checked=S.confettiOn;
+$("groupSize").value=S.groupSize;$("autoRemove").checked=S.autoRemove;
+updateLabels();
+if(S.mode&&S.mode!=="standard")setMode(S.mode);else{updateCopy()}
+resize();onInput();
+(function loop(t){draw(t);requestAnimationFrame(loop)})(0);
+})();
+</script>
+</body>
+</html>
